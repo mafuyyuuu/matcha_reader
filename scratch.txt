@@ -1,0 +1,3 @@
+  Future<void> _saveBookmark(String chapterNum) async {
+    await ref.read(bookmarkProvider.notifier).saveBookmark(widget.mangaId, widget.title, chapterNum);
+  }
