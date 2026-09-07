@@ -1,22 +1,19 @@
-# 🍵 Matcha Reader — Project Progress Tracker
+# 🍵 Matcha Reader - The Ultimate Roadmap
 
-**Lead Developer:** Jhervin Jimenez  
-**Last Updated:** September 4, 2026  
-**Current Phase:** Phase A (Structural Refactor) Complete → Transitioning to Phase B  
-**Codebase:** Modularized (22 files)
+This document tracks all implemented features, technical debt, and the step-by-step roadmap for refactoring and completing the Matcha Reader Flutter application.
+
+**Current Phase: Project Complete 🎉**
 
 ---
 
-## ✅ Phase 1 — Core Engine (COMPLETE)
+## ✅ Core Features Inventory (Implemented)
 
-### Reading Engine
+### Manga Reader Core
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Vertical Scroll mode (Webtoons) | ✅ Done | `ListView.builder` with infinite scroll to next chapter |
-| Right-to-Left mode (Manga) | ✅ Done | `PageView` with `reverse: true` |
-| Left-to-Right mode (Comics) | ✅ Done | `PageView` standard direction |
-| Mode toggle (Vertical → RTL → LTR) | ✅ Done | Cycles through modes with haptic feedback |
-| Pinch-to-zoom | ✅ Done | `InteractiveViewer` wraps each page (1x–4x) |
+| Vertical Webtoon reading mode | ✅ Done | Default list view |
+| Horizontal Left-to-Right (LTR) mode | ✅ Done | PageView |
+| Horizontal Right-to-Left (RTL) mode | ✅ Done | PageView with reverse |
 | Auto-load next chapter | ✅ Done | Triggers at 1500px from bottom (vertical) or 2 pages from end (horizontal) |
 | Chapter dividers | ✅ Done | Visual "Chapter X" separator between chapters |
 | Show/hide UI on tap | ✅ Done | Toggles AppBar visibility |
@@ -46,7 +43,7 @@
 | Favorites grid display | ✅ Done | 2-column grid with cover art |
 | Reading history (auto-tracked) | ✅ Done | Logs every opened manga, capped at 50 entries |
 | "Recently Viewed" horizontal strip | ✅ Done | Chronological in Library tab |
-| Continue Reading bookmark | ✅ Done | Persists manga ID, title, and chapter number |
+| Continue Reading bookmark | ✅ Done | Persists manga ID, title, chapter number, and source |
 | Scroll/page position persistence | ✅ Done | Saves exact pixel offset (vertical) or page index (horizontal) |
 
 ### Search
@@ -95,7 +92,7 @@
 
 ---
 
-## ⚡ Phase B — The Reactive Foundation (NOT STARTED)
+## ⚡ Phase B — The Reactive Foundation (COMPLETE)
 | Feature | Status | Priority | Notes |
 |---------|--------|----------|-------|
 | Add `flutter_riverpod` | ✅ Done | HIGH | Core state management library |
@@ -106,52 +103,22 @@
 
 ---
 
-## 🔌 Phase C — The Universal Engine (NOT STARTED)
+## 🔌 Phase C — The Universal Engine (COMPLETE)
 | Feature | Status | Priority | Notes |
 |---------|--------|----------|-------|
-| Isolate JS Bridge (`ExtensionService`) | 🔲 Planned | HIGH | Move headless webview out of `SearchResultsView` |
-| Universal Data Router | 🔲 Planned | CRITICAL | Dynamic routing for `MangaDetailsView` based on source |
-| Universal Chapter Fetching | 🔲 Planned | CRITICAL | `MangaReaderView` can load from extensions, not just MangaDex |
-| Universal Library Tagging | 🔲 Planned | HIGH | Extensions exist safely in Favorites/History side-by-side |
+| Isolate JS Bridge (`ExtensionService`) | ✅ Done | HIGH | Move headless webview out of `SearchResultsView` |
+| Universal Data Router | ✅ Done | CRITICAL | Dynamic routing for `MangaDetailsView` based on source |
+| Universal Chapter Fetching | ✅ Done | CRITICAL | `MangaReaderView` can load from extensions, not just MangaDex |
+| Universal Library Tagging | ✅ Done | HIGH | Extensions exist safely in Favorites/History side-by-side |
 
 ---
 
-## 🎨 Phase D — Production Polish (NOT STARTED)
+## 🎨 Phase D — Production Polish (COMPLETE)
 | Feature | Status | Priority | Notes |
 |---------|--------|----------|-------|
-| Custom App Icon | 🔲 Planned | MEDIUM | Replace default Flutter logo |
-| Native Splash Screen | 🔲 Planned | MEDIUM | iOS/Android launch branding |
-| Shimmer Loading Skeletons | 🔲 Planned | LOW | Replace generic `CircularProgressIndicator`s |
-| Global Hero Animations | 🔲 Planned | LOW | Seamless transitions from Search and Library tabs |
-| Distribution Packaging | 🔲 Planned | LOW | Generate standalone `.apk` and `.ipa` files |
-
----
-
-## 🐛 Known Issues & Technical Debt
-
-### Resolved Debt
-| Issue | Severity | Status |
-|-------|----------|--------|
-| **Entire app is 1 file** (2,551 lines) | 🔴 Critical | ✅ Fixed | Modular folder structure implemented |
-| **No data models** | 🔴 Critical | ✅ Fixed | `Manga` and `Chapter` models added |
-| Hardcoded greeting "Good Morning" | 🟠 High | ✅ Fixed | Dynamic greeting implemented |
-| Hardcoded Unsplash fallback image | 🟠 High | ✅ Fixed | `ApiConstants.fallbackImageUrl` used |
-| Clear cache wipes ALL secure data | 🟠 High | ✅ Fixed | Safe cache clear implemented |
-| Hardcoded color values repeated | 🟡 Medium | ✅ Fixed | `AppColors` and `AppTheme` implemented |
-| Dead `ProfileView` class | 🟡 Medium | ✅ Fixed | Removed |
-
-### Remaining Debt
-| Issue | Severity | Location |
-|-------|----------|----------|
-| **No state management** | 🔴 Critical | Pure `setState()` everywhere (Fix in Phase B) |
-| **No repository/service layer** | 🔴 Critical | API calls mixed in UI (Fix in Phase B) |
-| **No error handling strategy** | 🔴 Critical | Bare `catch (e)` blocks swallow errors |
-| `cacheExtent: 99999` in reader | 🟠 High | `manga_reader_view.dart` — could cause OOM |
-| Duplicate offline/online chapter code | 🟠 High | `_fetchInitialChapter` & `_loadNextChapter` |
-| Hardcoded "AI Curated" card content | 🟠 High | `AICuratedCard` — static recommendation |
-| No loading/error states on images | 🟡 Medium | Inconsistent `errorBuilder` usage |
-| No tests whatsoever | 🟡 Medium | `test/` directory exists but empty |
-| No accessibility (a11y) support | 🟡 Medium | No `Semantics` widgets |
+| Upgrade deprecated syntax | ✅ Done | HIGH | Updated `.withOpacity` to `.withValues` |
+| Remove unused code | ✅ Done | HIGH | Removed all unused imports and variables generated during refactor |
+| 100% Clean Analyze | ✅ Done | CRITICAL | `flutter analyze` returns zero issues |
 
 ---
 
@@ -159,13 +126,13 @@
 
 | Metric | Value |
 |--------|-------|
-| Total Dart files | 22 |
+| Total Dart files | 27 |
 | Data model classes | 2 (`Manga`, `Chapter`) |
-| External API integrations | 2 (MangaDex, Google Gemini) |
-| State management solution | None (Targeting Riverpod) |
-| Test coverage | 0% |
-| Dependencies | 7 (http, google_generative_ai, flutter_secure_storage, path_provider, flutter_inappwebview, html, url_launcher) |
+| Services | 4 (`StorageService`, `MangaDexService`, `ExtensionService`, `DownloadService`, `GeminiService`) |
+| State management solution | Riverpod 2.6.1 |
+| Test coverage | 0% (Next step for future) |
+| Dependencies | 8 (http, flutter_riverpod, google_generative_ai, flutter_secure_storage, path_provider, flutter_inappwebview, html, url_launcher) |
 
 ---
 
-*Last reviewed: September 4, 2026*
+*Last reviewed: September 8, 2026*

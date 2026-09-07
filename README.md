@@ -3,18 +3,18 @@
 An enterprise-grade, multi-format Manga and Manhwa reader built with Flutter. Matcha Reader combines a sleek UI with advanced local storage management, AI-curated discovery, and a compliance-safe Bring Your Own Repository (BYOR) extension architecture.
 
 **Lead Developer:** Jhervin Jimenez
-**Version:** 1.0.0 Pro
+**Version:** 2.0.0 Pro (Riverpod Architecture)
 
 ---
 
 ## ✨ Core Features
 
+* **Universal BYOR Extension Engine:** Add third-party JavaScript or JSON repositories to search and read from anywhere on the internet. Executes safely in a headless `InAppWebView` with a custom CORS-bypassing `nativeFetch` bridge.
 * **Multi-Format Reading Engine:** Seamlessly toggle between Vertical Scroll (Webtoons), Right-to-Left (Japanese Manga), and Left-to-Right (Western Comics) with dynamic state preservation.
-* **True Offline Downloads:** Bypass the internet entirely. Chapters are downloaded byte-by-byte into hidden device storage and read locally via an offline interceptor.
-* **AI Discover Engine:** Integrated with Google's Gemini 1.5 Flash. Features a chat-based UI that recommends titles and generates interactive "Smart Links" using Regex to instantly search the database.
+* **True Offline Downloads:** Bypass the internet entirely. Chapters are downloaded byte-by-byte into hidden device storage and read locally via an offline interceptor inside `DownloadService`.
+* **AI Discover Engine:** Integrated with Google's Gemini Flash. Features a chat-based UI that recommends titles and generates interactive "Smart Links" using Regex to instantly search the database.
 * **Advanced Cache Management:** Calculates temporary image bloat and allows users to wipe RAM and local directory caches with a single tap to protect device storage.
-* **BYOR Extension UI:** A "Blank Slate" source manager that allows users to add community-driven repository URLs, ensuring App Store and Play Store compliance while maintaining extensibility.
-* **Persistent Library Memory:** Utilizes `FlutterSecureStorage` to save reading progress, exact scroll/page positions, and favorite titles locally with hardware-backed encryption.
+* **Reactive Library Memory:** Utilizes `Riverpod` and `FlutterSecureStorage` to save reading progress, exact scroll/page positions, and favorite titles locally, automatically updating the UI across all tabs in real-time.
 
 ---
 
@@ -22,7 +22,7 @@ An enterprise-grade, multi-format Manga and Manhwa reader built with Flutter. Ma
 
 ### Prerequisites
 To run this project, you will need to have the following installed on your machine:
-* [Flutter SDK](https://docs.flutter.dev/get-started/install) (Version 3.19.0 or higher recommended)
+* [Flutter SDK](https://docs.flutter.dev/get-started/install)
 * Dart SDK
 * Android Studio / Xcode (for emulation and building)
 * A valid [Google Gemini API Key](https://aistudio.google.com/app/apikey)
@@ -31,7 +31,7 @@ To run this project, you will need to have the following installed on your machi
 
 **1. Clone the repository**
 ```bash
-git clone [https://github.com/yourusername/matcha_reader.git](https://github.com/yourusername/matcha_reader.git)
+git clone https://github.com/yourusername/matcha_reader.git
 cd matcha_reader
 ```
 
@@ -46,72 +46,33 @@ For security, the API key is not hardcoded. You must provide your Google Generat
 flutter run --dart-define=GEMINI_API_KEY=your_actual_key_here
 ```
 
-**4. Run the app**
-```bash
-flutter run --dart-define=GEMINI_API_KEY=your_actual_key_here
-```
+---
 
-## 🛡️ Security & Production
+## 🏗️ Architecture Overview
 
-To maintain the security of this project:
+The app follows a modern, decoupled architecture using **Riverpod** for state management and dependency injection.
 
-1.  **API Keys:** Never commit API keys to version control. This project uses `--dart-define` to inject keys at build time.
-2.  **Secure Storage:** The project includes `flutter_secure_storage` for encrypted local data. Use this instead of `shared_preferences` for sensitive information.
-3.  **Obfuscation:** For release builds, always obfuscate your code to prevent reverse-engineering:
-    ```bash
-    flutter build apk --obfuscate --split-debug-info=./debug_info
-    ```
-4.  **SSL Pinning:** For production, consider implementing SSL pinning to prevent Man-in-the-Middle (MitM) attacks on the MangaDex API.
+### Services Layer
+* `MangaDexService`: Handles all API routing and data mapping for the default MangaDex integration.
+* `ExtensionService`: The Universal JS Engine. Evaluates third-party scripts in a headless webview.
+* `DownloadService`: The Offline Interceptor. Checks local disk for pages before making network requests.
+* `GeminiService`: Handles the Generative AI connection and chat state.
+* `StorageService`: The hardware-backed encryption layer storing user history, favorites, and settings.
 
-## 🚀 Production Build
-
-When you are ready to distribute your app, use these commands to ensure maximum security:
-
-### Android (APK)
-```bash
-flutter build apk --obfuscate --split-debug-info=./debug_info --dart-define=GEMINI_API_KEY=your_key
-```
-
-### iOS (IPA)
-```bash
-flutter build ipa --obfuscate --split-debug-info=./debug_info --dart-define=GEMINI_API_KEY=your_key
-```
+### UI Layer
+The UI consists of reactive `ConsumerStatefulWidget`s that watch global providers (e.g. `historyProvider`, `favoritesProvider`, `bookmarkProvider`) to render updates instantly without manual state drilling.
 
 ---
 
 ## 📦 Dependencies
 
-This project relies on the following core Flutter packages:
-* `http`: For fetching MangaDex API data and downloading image bytes.
+* `flutter_riverpod`: State management and dependency injection.
+* `http`: For fetching API data and downloading image bytes.
 * `google_generative_ai`: For powering the Discover Engine chat.
-* `flutter_secure_storage`: For encrypted local database memory (bookmarks, favorites, repos, scroll positions).
+* `flutter_secure_storage`: For encrypted local database memory.
+* `flutter_inappwebview`: For the headless JavaScript BYOR extension environment.
 * `path_provider`: For accessing the device's application documents and temporary directories.
-
-To install them manually, run:
-```bash
-flutter pub add http google_generative_ai flutter_secure_storage path_provider
-```
-
----
-
-## 🏗️ Architecture Overview
-
-The app is currently structured with a bottom navigation root managing 5 primary views:
-
-1. **HomeView:** Displays trending API data and dynamically renders a "Continue Reading" card based on local storage.
-2. **DiscoverView:** A conversational UI communicating with Gemini AI, featuring Regex-powered action chips.
-3. **LibraryView:** A grid-based rendering of saved JSON data tracking the user's favorited manga.
-4. **SourcesView:** The UI layer for adding and managing external extension URLs.
-5. **SettingsView:** The file-system manager calculating and wiping directory cache.
-6. **MangaReaderView:** The core engine utilizing both `ListView.builder` and `PageView` with an offline fallback interceptor.
-
----
-
-## 🔮 Future Roadmap
-
-* **Phase 2: JavaScript Bridge:** Implementing `flutter_js` to parse community extension scripts added via the Sources tab.
-* **Source Standardization:** Refactoring the database models to track `source` tags alongside manga IDs for universal library compatibility.
-* **Hero Animations:** Expanding the custom transition routing across all tabs.
+* `html`: For parsing declarative JSON extension selectors.
 
 ---
 

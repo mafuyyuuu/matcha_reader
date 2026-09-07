@@ -9,6 +9,8 @@ class MangaCard extends StatelessWidget {
   final String chapter;
   final double progress;
   final String imageUrl;
+  final String source;
+  final bool isUniversal;
 
   const MangaCard({
     super.key,
@@ -16,7 +18,9 @@ class MangaCard extends StatelessWidget {
     required this.title,
     required this.chapter,
     required this.progress,
-    required this.imageUrl
+    required this.imageUrl,
+    this.source = 'MangaDex',
+    this.isUniversal = false,
   });
 
   @override
@@ -30,7 +34,8 @@ class MangaCard extends StatelessWidget {
             builder: (context) => MangaDetailsView(
                 mangaId: mangaId,
                 title: title,
-                imageUrl: imageUrl
+                imageUrl: imageUrl,
+                source: source,
             ),
           ),
         );
@@ -42,7 +47,7 @@ class MangaCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,12 +70,13 @@ class MangaCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 2),
-            Text('Chapter $chapter', style: const TextStyle(color: AppColors.mutedSage, fontSize: 12, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(isUniversal ? source : 'Chapter $chapter', style: TextStyle(color: isUniversal ? Colors.blue : AppColors.mutedSage, fontSize: 12, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
             const Spacer(),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(value: progress, backgroundColor: AppColors.softMintBg, color: AppColors.matchaGreen, minHeight: 6),
-            ),
+            if (!isUniversal)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(value: progress, backgroundColor: AppColors.softMintBg, color: AppColors.matchaGreen, minHeight: 6),
+              ),
           ],
         ),
       ),

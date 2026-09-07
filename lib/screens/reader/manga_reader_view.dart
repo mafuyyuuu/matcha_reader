@@ -1,11 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import '../../core/theme/app_colors.dart';
-import '../../core/constants/api_constants.dart';
 import '../../services/storage_service.dart';
 import '../../providers/providers.dart';
 
@@ -16,6 +13,7 @@ class MangaReaderView extends ConsumerStatefulWidget {
   final String title;
   final List<Map<String, String>> chapters;
   final int initialIndex;
+  final String source;
 
   const MangaReaderView({
     super.key,
@@ -23,6 +21,7 @@ class MangaReaderView extends ConsumerStatefulWidget {
     required this.title,
     required this.chapters,
     required this.initialIndex,
+    this.source = 'MangaDex',
   });
 
   @override
@@ -73,7 +72,7 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
   }
 
   Future<void> _saveScrollPosition() async {
-    final key = StorageService.scrollPositionKey(widget.mangaId);
+    final key = StorageService.scrollPositionKey("${widget.source}_${widget.mangaId}");
     if (_readMode == ReadMode.vertical) {
       if (_scrollController.hasClients) {
         await StorageService.write(key, _scrollController.offset.toString());
@@ -86,7 +85,7 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
   }
 
   Future<void> _saveBookmark(String chapterNum) async {
-    await ref.read(bookmarkProvider.notifier).saveBookmark(widget.mangaId, widget.title, chapterNum);
+    await ref.read(bookmarkProvider.notifier).saveBookmark(widget.mangaId, widget.title, chapterNum, source: widget.source);
   }
 
   void _toggleReadMode() {
@@ -102,12 +101,21 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
     setState(() => _isLoading = true);
     final chapter = widget.chapters[_currentIndex];
     
+    
     try {
-      final pages = await ref.read(downloadServiceProvider).getChapterPages(
-        widget.mangaId, 
-        chapter['id']!,
-        networkFallback: () => ref.read(mangaDexServiceProvider).fetchChapterPages(chapter['id']!),
-      );
+      List<String> pages;
+      if (widget.source == 'MangaDex') {
+        pages = await ref.read(downloadServiceProvider).getChapterPages(
+          widget.mangaId, 
+          chapter['id']!,
+          networkFallback: () => ref.read(mangaDexServiceProvider).fetchChapterPages(chapter['id']!),
+        );
+      } else {
+        // Universal Routing
+        final repos = ref.read(extensionsProvider);
+        final repo = repos.firstWhere((r) => r['name'] == widget.source || r['url'] == widget.source);
+        pages = await ref.read(extensionServiceProvider).fetchChapterPages(repo, chapter['id']!);
+      }
 
       if (mounted) {
         setState(() {
@@ -127,7 +135,7 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
 
   void _handleSafeJump() async {
     if (_hasRestoredPosition) return;
-    final key = StorageService.scrollPositionKey(widget.mangaId);
+    final key = StorageService.scrollPositionKey("${widget.source}_${widget.mangaId}");
     final posStr = await StorageService.read(key);
     if (posStr != null && mounted) {
       final pos = double.tryParse(posStr) ?? 0;
@@ -148,15 +156,23 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
 
   Future<void> _loadNextChapter() async {
     setState(() => _isLoading = true);
-    _currentIndex++;
     final chapter = widget.chapters[_currentIndex];
+    
+    _currentIndex++;
 
     try {
-      final pages = await ref.read(downloadServiceProvider).getChapterPages(
-        widget.mangaId, 
-        chapter['id']!,
-        networkFallback: () => ref.read(mangaDexServiceProvider).fetchChapterPages(chapter['id']!),
-      );
+      List<String> pages;
+      if (widget.source == 'MangaDex') {
+        pages = await ref.read(downloadServiceProvider).getChapterPages(
+          widget.mangaId, 
+          chapter['id']!,
+          networkFallback: () => ref.read(mangaDexServiceProvider).fetchChapterPages(chapter['id']!),
+        );
+      } else {
+        final repos = ref.read(extensionsProvider);
+        final repo = repos.firstWhere((r) => r['name'] == widget.source || r['url'] == widget.source);
+        pages = await ref.read(extensionServiceProvider).fetchChapterPages(repo, chapter['id']!);
+      }
 
       if (mounted) {
         setState(() {
@@ -191,8 +207,8 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
 
   @override
   Widget build(BuildContext context) {
-    final chapter = widget.chapters[_currentIndex];
 
+    final chapter = widget.chapters[_currentIndex];
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(

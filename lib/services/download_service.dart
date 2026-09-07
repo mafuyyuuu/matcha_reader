@@ -9,7 +9,7 @@ class DownloadService {
     final dir = await getApplicationDocumentsDirectory();
     Set<String> downloaded = {};
     for (var chapId in chapterIds) {
-      final chapDir = Directory('\${dir.path}/downloads/$mangaId/$chapId');
+      final chapDir = Directory('${dir.path}/downloads/$mangaId/$chapId');
       if (await chapDir.exists() && chapDir.listSync().isNotEmpty) {
         downloaded.add(chapId);
       }
@@ -19,7 +19,7 @@ class DownloadService {
 
   Future<void> downloadChapter(String mangaId, String chapterId) async {
     final appDir = await getApplicationDocumentsDirectory();
-    final saveDir = Directory('\${appDir.path}/downloads/$mangaId/$chapterId');
+    final saveDir = Directory('${appDir.path}/downloads/$mangaId/$chapterId');
     
     if (await saveDir.exists() && saveDir.listSync().isNotEmpty) return;
 
@@ -36,9 +36,9 @@ class DownloadService {
       if (!await saveDir.exists()) await saveDir.create(recursive: true);
       
       for (int i = 0; i < fileNames.length; i++) {
-        final imgUrl = Uri.parse('\$baseUrl/data/\$hash/\${fileNames[i]}');
+        final imgUrl = Uri.parse('$baseUrl/data/$hash/${fileNames[i]}');
         final imgRes = await http.get(imgUrl);
-        final file = File('\${saveDir.path}/page_$i.jpg');
+        final file = File('${saveDir.path}/page_$i.jpg');
         await file.writeAsBytes(imgRes.bodyBytes);
       }
     } else {
@@ -48,7 +48,7 @@ class DownloadService {
 
   Future<List<String>> getChapterPages(String mangaId, String chapterId, {required Future<List<String>> Function() networkFallback}) async {
     final dir = await getApplicationDocumentsDirectory();
-    final chapDir = Directory('\${dir.path}/downloads/$mangaId/$chapterId');
+    final chapDir = Directory('${dir.path}/downloads/$mangaId/$chapterId');
     
     // OFFLINE INTERCEPTOR: Check if chapter is downloaded locally
     if (await chapDir.exists()) {

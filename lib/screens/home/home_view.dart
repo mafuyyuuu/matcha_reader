@@ -105,11 +105,11 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch the bookmark provider for real-time Continue Reading updates
     final bookmark = ref.watch(bookmarkProvider);
     final lastReadId = bookmark['id'];
     final lastReadTitle = bookmark['title'];
     final lastReadChapter = bookmark['chapter'];
+    final lastReadSource = bookmark['source'] ?? 'MangaDex';
 
     return SafeArea(
       child: GestureDetector(
@@ -153,7 +153,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,9 +205,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     MaterialPageRoute(
                       builder: (context) => MangaDetailsView(
                         mangaId: lastReadId,
-                        title: lastReadTitle!,
+                        title: lastReadTitle ?? "Unknown",
                         imageUrl: ApiConstants.fallbackImageUrl,
                         resumeChapterNum: lastReadChapter,
+                        source: lastReadSource,
                       ),
                     ),
                   );
@@ -218,7 +219,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.matchaGreen, width: 1.5),
-                    boxShadow: [BoxShadow(color: AppColors.matchaGreen.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
+                    boxShadow: [BoxShadow(color: AppColors.matchaGreen.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
                   ),
                   child: Row(
                     children: [
@@ -228,7 +229,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(lastReadTitle!, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.darkForest), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(lastReadTitle ?? "Unknown", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.darkForest), maxLines: 1, overflow: TextOverflow.ellipsis),
                             const SizedBox(height: 4),
                             Text('Resume Chapter $lastReadChapter', style: const TextStyle(color: AppColors.matchaGreen, fontWeight: FontWeight.w600, fontSize: 13)),
                           ],

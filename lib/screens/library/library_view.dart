@@ -18,6 +18,7 @@ class LibraryView extends ConsumerWidget {
     final lastReadId = bookmark['id'];
     final lastReadTitle = bookmark['title'];
     final lastReadChapter = bookmark['chapter'];
+    final lastReadSource = bookmark['source'] ?? 'MangaDex';
 
     return SafeArea(
       child: CustomScrollView(
@@ -43,7 +44,7 @@ class LibraryView extends ConsumerWidget {
                           final item = history[index];
                           return GestureDetector(
                             onTap: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => MangaDetailsView(mangaId: item['id'], title: item['title'], imageUrl: item['imageUrl'])));
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => MangaDetailsView(mangaId: item['id'], title: item['title'], imageUrl: item['imageUrl'], source: item['source'] ?? 'MangaDex')));
                             },
                             child: Container(
                               width: 90,
@@ -72,7 +73,7 @@ class LibraryView extends ConsumerWidget {
                   const Text('Continue Reading', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.sageText)),
                   const SizedBox(height: 16),
                   lastReadId != null
-                      ? _buildBookmarkCard(context, lastReadId, lastReadTitle!, lastReadChapter!)
+                      ? _buildBookmarkCard(context, lastReadId, lastReadTitle!, lastReadChapter!, lastReadSource)
                       : Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(color: AppColors.softMintBg, borderRadius: BorderRadius.circular(15)),
@@ -111,7 +112,7 @@ class LibraryView extends ConsumerWidget {
                       HapticFeedback.lightImpact();
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => MangaDetailsView(mangaId: fav['id'], title: fav['title'], imageUrl: fav['imageUrl'])),
+                        MaterialPageRoute(builder: (context) => MangaDetailsView(mangaId: fav['id'], title: fav['title'], imageUrl: fav['imageUrl'], source: fav['source'] ?? 'MangaDex')),
                       );
                     },
                     child: Container(
@@ -135,14 +136,14 @@ class LibraryView extends ConsumerWidget {
     );
   }
 
-  Widget _buildBookmarkCard(BuildContext context, String lastReadId, String lastReadTitle, String lastReadChapter) {
+  Widget _buildBookmarkCard(BuildContext context, String lastReadId, String lastReadTitle, String lastReadChapter, String source) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => MangaDetailsView(mangaId: lastReadId, title: lastReadTitle, imageUrl: ApiConstants.fallbackImageUrl, resumeChapterNum: lastReadChapter)));
+        Navigator.push(context, MaterialPageRoute(builder: (context) => MangaDetailsView(mangaId: lastReadId, title: lastReadTitle, imageUrl: ApiConstants.fallbackImageUrl, resumeChapterNum: lastReadChapter, source: source)));
       },
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.softMintBg, width: 2), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))]),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.softMintBg, width: 2), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5))]),
         child: Row(
           children: [
             Container(width: 50, height: 50, decoration: BoxDecoration(color: AppColors.matchaGreen, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.menu_book_rounded, color: Colors.white)),

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +10,7 @@ class MangaDetailsView extends ConsumerStatefulWidget {
   final String title;
   final String imageUrl;
   final String? resumeChapterNum;
+  final String source;
 
   const MangaDetailsView({
     super.key,
@@ -18,6 +18,7 @@ class MangaDetailsView extends ConsumerStatefulWidget {
     required this.title,
     required this.imageUrl,
     this.resumeChapterNum,
+    this.source = 'MangaDex',
   });
 
   @override
@@ -31,7 +32,6 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
   String _status = "Unknown";
   String _year = "N/A";
   List<Map<String, String>> _chapters = [];
-
   Set<String> _downloadedChapters = {};
 
   @override
@@ -39,58 +39,68 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
     super.initState();
     _fetchDetails();
     Future.microtask(() {
-      ref.read(historyProvider.notifier).addToHistory(widget.mangaId, widget.title, widget.imageUrl);
+      ref.read(historyProvider.notifier).addToHistory(widget.mangaId, widget.title, widget.imageUrl, source: widget.source);
     });
   }
 
   Future<void> _toggleFavorite() async {
     HapticFeedback.mediumImpact();
-    await ref.read(favoritesProvider.notifier).toggleFavorite(widget.mangaId, widget.title, widget.imageUrl);
+    await ref.read(favoritesProvider.notifier).toggleFavorite(widget.mangaId, widget.title, widget.imageUrl, source: widget.source);
   }
 
   Future<void> _checkDownloadedChapters(List<Map<String, String>> chapters) async {
     final ids = chapters.map((c) => c["id"]!).toList();
-    final downloaded = await ref.read(downloadServiceProvider).getDownloadedChapterIds(widget.mangaId, ids);
+    final downloaded = await ref.read(downloadServiceProvider).getDownloadedChapterIds("${widget.source}_${widget.mangaId}", ids);
     if (mounted) setState(() => _downloadedChapters = downloaded);
   }
 
   Future<void> _downloadChapter(String chapterId, String chapterNum) async {
+    if (widget.source != 'MangaDex') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Downloading from extensions is not yet supported.')));
+      return;
+    }
     if (_downloadedChapters.contains(chapterId)) return;
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Downloading Chapter $chapterNum...'), backgroundColor: AppColors.matchaGreen));
     try {
-      await ref.read(downloadServiceProvider).downloadChapter(widget.mangaId, chapterId);
+      await ref.read(downloadServiceProvider).downloadChapter("${widget.source}_${widget.mangaId}", chapterId);
       if (mounted) {
         setState(() => _downloadedChapters.add(chapterId));
         HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Chapter $chapterNum Downloaded!'), backgroundColor: Colors.green));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download failed.'), backgroundColor: Colors.red));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download failed.'), backgroundColor: Colors.red));
     }
   }
 
   Future<void> _fetchDetails() async {
     try {
-      final mangaService = ref.read(mangaDexServiceProvider);
-      
-      final details = await mangaService.fetchMangaDetails(widget.mangaId);
-      final rawChapters = await mangaService.fetchMangaChapters(widget.mangaId);
-      
-      List<Map<String, String>> uniqueList = rawChapters.map((c) => {
-        'id': c.id,
-        'number': c.number,
-        'date': c.date,
-      }).toList();
+      Map<String, dynamic> details;
+      List<Map<String, String>> uniqueList = [];
+
+      if (widget.source == 'MangaDex') {
+        final mangaService = ref.read(mangaDexServiceProvider);
+        details = await mangaService.fetchMangaDetails(widget.mangaId);
+        final rawChapters = await mangaService.fetchMangaChapters(widget.mangaId);
+        uniqueList = rawChapters.map((c) => {'id': c.id, 'number': c.number, 'date': c.date}).toList();
+      } else {
+        // UNIVERSAL ROUTING
+        final extService = ref.read(extensionServiceProvider);
+        final repos = ref.read(extensionsProvider);
+        final repo = repos.firstWhere((r) => r['name'] == widget.source || r['url'] == widget.source);
+        
+        details = await extService.fetchMangaDetails(repo, widget.mangaId);
+        final rawChapters = await extService.fetchMangaChapters(repo, widget.mangaId);
+        uniqueList = rawChapters.map((c) => {'id': c.id, 'number': c.number, 'date': c.date}).toList();
+      }
 
       if (mounted) {
         setState(() {
-          _description = details['description'];
-          _author = details['author'];
-          _status = details['status'];
-          _year = details['year'];
+          _description = details['description'] ?? "No description available.";
+          _author = details['author'] ?? "Unknown";
+          _status = details['status'] ?? "Unknown";
+          _year = details['year']?.toString() ?? "N/A";
           _chapters = uniqueList;
           _isLoading = false;
         });
@@ -103,12 +113,13 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
         if (targetIndex != -1) {
           Future.microtask(() {
             if (mounted) {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => MangaReaderView(mangaId: widget.mangaId, title: widget.title, chapters: uniqueList, initialIndex: targetIndex)));
+              Navigator.push(context, MaterialPageRoute(builder: (context) => MangaReaderView(mangaId: widget.mangaId, title: widget.title, chapters: uniqueList, initialIndex: targetIndex, source: widget.source)));
             }
           });
         }
       }
     } catch (e) {
+      debugPrint("Details Error: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -131,7 +142,7 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
   @override
   Widget build(BuildContext context) {
     final favorites = ref.watch(favoritesProvider);
-    final isFavorited = favorites.any((fav) => fav['id'] == widget.mangaId);
+    final isFavorited = favorites.any((fav) => fav['id'] == widget.mangaId && fav['source'] == widget.source);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -154,7 +165,18 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.darkForest, letterSpacing: -0.5)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: Text(widget.title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.darkForest, letterSpacing: -0.5))),
+                      if (widget.source != 'MangaDex')
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(8)),
+                          child: Text(widget.source, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        )
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -185,7 +207,7 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                 return InkWell(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => MangaReaderView(mangaId: widget.mangaId, title: widget.title, chapters: _chapters, initialIndex: index)));
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => MangaReaderView(mangaId: widget.mangaId, title: widget.title, chapters: _chapters, initialIndex: index, source: widget.source)));
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -198,19 +220,20 @@ class _MangaDetailsViewState extends ConsumerState<MangaDetailsView> {
                           children: [
                             Text('Chapter ${chapter["number"]}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.darkForest)),
                             const SizedBox(height: 4),
-                            Text(chapter['date']!, style: const TextStyle(fontSize: 12, color: AppColors.mutedSage)),
+                            Text(chapter['date'] ?? '', style: const TextStyle(fontSize: 12, color: AppColors.mutedSage)),
                           ],
                         ),
-                        Row(
-                          children: [
-                            if (isDownloaded) const Icon(Icons.check_circle_rounded, color: AppColors.matchaGreen, size: 20),
-                            const SizedBox(width: 16),
-                            IconButton(
-                              icon: Icon(Icons.download_rounded, color: isDownloaded ? AppColors.mutedSage : AppColors.matchaGreen),
-                              onPressed: () => _downloadChapter(chapter['id']!, chapter['number']!),
-                            ),
-                          ],
-                        )
+                        if (widget.source == 'MangaDex')
+                          Row(
+                            children: [
+                              if (isDownloaded) const Icon(Icons.check_circle_rounded, color: AppColors.matchaGreen, size: 20),
+                              const SizedBox(width: 16),
+                              IconButton(
+                                icon: Icon(Icons.download_rounded, color: isDownloaded ? AppColors.mutedSage : AppColors.matchaGreen),
+                                onPressed: () => _downloadChapter(chapter['id']!, chapter['number']!),
+                              ),
+                            ],
+                          )
                       ],
                     ),
                   ),
