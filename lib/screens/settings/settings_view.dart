@@ -1,33 +1,31 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
+import '../../services/storage_service.dart';
+import '../../providers/providers.dart';
 
-class SettingsView extends StatefulWidget {
+class SettingsView extends ConsumerStatefulWidget {
   const SettingsView({super.key});
 
   @override
-  State<SettingsView> createState() => _SettingsViewState();
+  ConsumerState<SettingsView> createState() => _SettingsViewState();
 }
 
-class _SettingsViewState extends State<SettingsView> {
-  bool _isLoading = true;
-  String _cacheSize = "0.00 MB";
+class _SettingsViewState extends ConsumerState<SettingsView> {
+  String _cacheSize = "Calculating...";
 
   @override
   void initState() {
     super.initState();
-    _calculateCacheSize();
+    _calculateCache();
   }
 
-  Future<void> _calculateCacheSize() async {
-    setState(() => _isLoading = true);
-
+  Future<void> _calculateCache() async {
     try {
       final tempDir = await getTemporaryDirectory();
-      double totalSize = 0;
-
+      int totalSize = 0;
       if (tempDir.existsSync()) {
         tempDir.listSync(recursive: true, followLinks: false).forEach((entity) {
           if (entity is File) {
@@ -35,139 +33,140 @@ class _SettingsViewState extends State<SettingsView> {
           }
         });
       }
-
-      setState(() {
-        _cacheSize = "${(totalSize / (1024 * 1024)).toStringAsFixed(2)} MB";
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _cacheSize = "${(totalSize / (1024 * 1024)).toStringAsFixed(2)} MB";
+        });
+      }
     } catch (e) {
-      setState(() {
-        _cacheSize = "Error reading storage";
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _cacheSize = "Unknown");
     }
   }
 
   Future<void> _clearCache() async {
-    HapticFeedback.heavyImpact();
-    setState(() => _isLoading = true);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Cache?'),
+        content: const Text('This will delete all temporary images and files. Your favorites and downloads will remain safe.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: AppColors.mutedSage))),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              setState(() => _cacheSize = "Clearing...");
+              try {
+                final tempDir = await getTemporaryDirectory();
+                if (tempDir.existsSync()) {
+                  tempDir.listSync(recursive: true, followLinks: false).forEach((entity) {
+                    if (entity is File) entity.deleteSync();
+                  });
+                }
+                await _calculateCache();
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cache cleared successfully'), backgroundColor: Colors.green));
+              } catch (e) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to clear cache'), backgroundColor: Colors.red));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Clear', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
-    try {
-      final tempDir = await getTemporaryDirectory();
-      if (tempDir.existsSync()) {
-        tempDir.listSync(recursive: true, followLinks: false).forEach((entity) {
-          if (entity is File) {
-            entity.deleteSync();
-          }
-        });
-      }
-
-      PaintingBinding.instance.imageCache.clear();
-      PaintingBinding.instance.imageCache.clearLiveImages();
-
-      // NOTE: We intentionally do NOT call secureStorage.deleteAll()
-      // to preserve user's favorites, history, and repos.
-
-      await _calculateCacheSize();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Cache cleared! Your data is safe.'),
-              backgroundColor: AppColors.matchaGreen,
-              behavior: SnackBarBehavior.floating,
-            )
-        );
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
+  Future<void> _wipeData() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Wipe All Data?', style: TextStyle(color: Colors.redAccent)),
+        content: const Text('This will permanently delete your favorites, reading history, downloaded chapters, and bookmarks. This cannot be undone.', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: AppColors.mutedSage))),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await StorageService.deleteAll();
+              final dir = await getApplicationDocumentsDirectory();
+              final downloadDir = Directory('${dir.path}/downloads');
+              if (downloadDir.existsSync()) downloadDir.deleteSync(recursive: true);
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data wiped. Please restart the app.'), backgroundColor: Colors.red));
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('WIPE EVERYTHING', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(appSettingsProvider);
+
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Settings', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.darkForest)),
             const SizedBox(height: 30),
-
-            const Text('Storage & Data', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.sageText)),
-            const SizedBox(height: 16),
-
+            
+            const Text('Library', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.sageText)),
+            const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.softMintBg, width: 2),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 5))],
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.softMintBg, width: 2)),
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                activeThumbColor: AppColors.matchaGreen,
+                title: const Text('Auto-Update Library', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkForest)),
+                subtitle: const Text('Check for new chapters automatically when the app launches.', style: TextStyle(fontSize: 12, color: AppColors.mutedSage)),
+                value: settings['autoUpdateLibrary'] ?? false,
+                onChanged: (val) {
+                  ref.read(appSettingsProvider.notifier).toggleAutoUpdate(val);
+                },
               ),
+            ),
+            const SizedBox(height: 30),
+
+            const Text('Data & Storage', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.sageText)),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.softMintBg, width: 2)),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: AppColors.softMintBg, borderRadius: BorderRadius.circular(12)),
-                        child: const Icon(Icons.sd_storage_rounded, color: AppColors.matchaGreen),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Image Cache', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkForest)),
-                            const SizedBox(height: 4),
-                            Text(
-                                'Temporary images taking up space.',
-                                style: TextStyle(color: Colors.grey[600], fontSize: 13)
-                            ),
-                          ],
-                        ),
-                      ),
-                      _isLoading
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.matchaGreen))
-                          : Text(_cacheSize, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.matchaGreen)),
-                    ],
+                  ListTile(
+                    leading: const Icon(Icons.cleaning_services_rounded, color: AppColors.matchaGreen),
+                    title: const Text('Clear Image Cache', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkForest)),
+                    subtitle: Text(_cacheSize, style: const TextStyle(color: AppColors.mutedSage)),
+                    trailing: const Icon(Icons.chevron_right, color: AppColors.mutedSage),
+                    onTap: _clearCache,
                   ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFECEC),
-                        foregroundColor: Colors.redAccent,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: _isLoading ? null : _clearCache,
-                      child: const Text('Clear Cache', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    ),
+                  const Divider(height: 1, color: AppColors.softMintBg),
+                  ListTile(
+                    leading: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent),
+                    title: const Text('Wipe All App Data', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                    subtitle: const Text('Irreversible action', style: TextStyle(color: AppColors.mutedSage)),
+                    onTap: _wipeData,
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 30),
-
-            const Text('About Matcha Reader', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.sageText)),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.info_outline_rounded, color: AppColors.matchaGreen),
-              title: const Text('Version', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.darkForest)),
-              trailing: const Text('1.0.0 Pro', style: TextStyle(color: AppColors.mutedSage, fontWeight: FontWeight.bold)),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.code_rounded, color: AppColors.matchaGreen),
-              title: const Text('Lead Developer', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.darkForest)),
-              trailing: const Text('Jhervin Jimenez', style: TextStyle(color: AppColors.mutedSage, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 40),
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.energy_savings_leaf, size: 40, color: AppColors.matchaGreen.withValues(alpha: 0.5)),
+                  const SizedBox(height: 8),
+                  const Text('Matcha Reader Pro', style: TextStyle(color: AppColors.darkForest, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('Version 2.0.0', style: TextStyle(color: AppColors.mutedSage, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  const Text('Built with Flutter ❤️', style: TextStyle(color: AppColors.mutedSage, fontSize: 12)),
+                ],
+              ),
             ),
           ],
         ),

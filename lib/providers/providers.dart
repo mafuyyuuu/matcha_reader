@@ -1,15 +1,39 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/storage_service.dart';
 import '../services/mangadex_service.dart';
 import '../services/download_service.dart';
 import '../services/extension_service.dart';
 import '../services/gemini_service.dart';
+export 'settings_provider.dart';
 
 // --- Services ---
 final mangaDexServiceProvider = Provider((ref) => MangaDexService());
 final downloadServiceProvider = Provider((ref) => DownloadService());
 final extensionServiceProvider = Provider((ref) => ExtensionService());
 final geminiServiceProvider = Provider((ref) => GeminiService());
+
+// --- Store Provider ---
+final extensionStoreProvider = FutureProvider<List<dynamic>>((ref) async {
+  // Use a local file URI for now since it's on desktop, or a raw github link if provided
+  try {
+    final response = await http.get(Uri.parse('https://raw.githubusercontent.com/jhervin/matcha_extensions/main/index.json'));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    }
+  } catch (e) {
+    // Fallback to local file for testing purposes if network fails
+    
+    final file = File('/Users/jhervin/Desktop/matcha_extensions/index.json');
+    if (await file.exists()) {
+       return jsonDecode(await file.readAsString()) as List<dynamic>;
+    }
+  }
+  return [];
+});
 
 // --- State Providers ---
 final favoritesProvider = StateNotifierProvider<FavoritesNotifier, List<Map<String, dynamic>>>((ref) {
@@ -30,8 +54,18 @@ class FavoritesNotifier extends StateNotifier<List<Map<String, dynamic>>> {
     if (exists) {
       state = state.where((fav) => !(fav['id'] == id && fav['source'] == source)).toList();
     } else {
-      state = [...state, {'id': id, 'title': title, 'imageUrl': imageUrl, 'source': source}];
+      state = [...state, {'id': id, 'title': title, 'imageUrl': imageUrl, 'source': source, 'unreadCount': 0}];
     }
+    await StorageService.saveFavorites(state);
+  }
+
+  Future<void> updateUnreadCount(String id, String source, int count) async {
+    state = state.map((fav) {
+      if (fav['id'] == id && fav['source'] == source) {
+        return {...fav, 'unreadCount': count};
+      }
+      return fav;
+    }).toList();
     await StorageService.saveFavorites(state);
   }
 }
@@ -79,7 +113,7 @@ class BookmarkNotifier extends StateNotifier<Map<String, String?>> {
 
   Future<void> saveBookmark(String mangaId, String title, String chapter, {String source = 'MangaDex'}) async {
     state = {'id': mangaId, 'title': title, 'chapter': chapter, 'source': source};
-    await StorageService.saveBookmark(mangaId, title, chapter, source: source); // We will update saveBookmark as well
+    await StorageService.saveBookmark(mangaId, title, chapter, source: source);
   }
 }
 
@@ -97,14 +131,14 @@ class ExtensionsNotifier extends StateNotifier<List<Map<String, dynamic>>> {
   }
 
   Future<void> addRepo(Map<String, dynamic> repo) async {
-    if (!state.any((r) => r['url'] == repo['url'])) {
+    if (!state.any((r) => r['url'] == repo['url'] || r['name'] == repo['name'])) {
       state = [...state, repo];
       await StorageService.saveRepos(state);
     }
   }
 
-  Future<void> removeRepo(String url) async {
-    state = state.where((r) => r['url'] != url).toList();
+  Future<void> removeRepo(String urlOrName) async {
+    state = state.where((r) => r['url'] != urlOrName && r['name'] != urlOrName).toList();
     await StorageService.saveRepos(state);
   }
 }

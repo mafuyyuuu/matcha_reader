@@ -1,20 +1,20 @@
 # 🍵 Matcha Reader
 
-An enterprise-grade, multi-format Manga and Manhwa reader built with Flutter. Matcha Reader combines a sleek UI with advanced local storage management, AI-curated discovery, and a compliance-safe Bring Your Own Repository (BYOR) extension architecture.
+An enterprise-grade, multi-format Manga and Manhwa reader built with Flutter. Matcha Reader combines a sleek UI with advanced local storage management, AI-curated discovery, and a compliance-safe Bring Your Own Repository (BYOR) extension architecture rivaling Tachimanga and Tachiyomi.
 
 **Lead Developer:** Jhervin Jimenez
-**Version:** 2.0.0 Pro (Riverpod Architecture)
+**Version:** 3.0.0 Pro (The Aggregator Engine)
 
 ---
 
 ## ✨ Core Features
 
-* **Universal BYOR Extension Engine:** Add third-party JavaScript or JSON repositories to search and read from anywhere on the internet. Executes safely in a headless `InAppWebView` with a custom CORS-bypassing `nativeFetch` bridge.
-* **Multi-Format Reading Engine:** Seamlessly toggle between Vertical Scroll (Webtoons), Right-to-Left (Japanese Manga), and Left-to-Right (Western Comics) with dynamic state preservation.
-* **True Offline Downloads:** Bypass the internet entirely. Chapters are downloaded byte-by-byte into hidden device storage and read locally via an offline interceptor inside `DownloadService`.
+* **Global Extension Store:** Browse and 1-tap install community-built web scrapers directly from a centralized JSON catalog.
+* **Concurrent Global Search:** Search for a title once, and Matcha Reader simultaneously queries MangaDex and every installed extension, streaming the results grouped by source.
+* **Library Sync & Tracking:** Pull-to-refresh your library to check all favorited manga for new chapters, instantly surfacing unread badges (`+2 New`). Toggle automatic background syncing in Settings.
+* **Aggressive Pre-fetching:** Implements `cached_network_image` to silently cache the next 3 pages into memory while you read, guaranteeing zero buffering on poor connections.
+* **Universal Offline Downloads:** Bypass the internet entirely. Chapters are downloaded byte-by-byte into hidden device storage and read locally via an offline interceptor inside `DownloadService`.
 * **AI Discover Engine:** Integrated with Google's Gemini Flash. Features a chat-based UI that recommends titles and generates interactive "Smart Links" using Regex to instantly search the database.
-* **Advanced Cache Management:** Calculates temporary image bloat and allows users to wipe RAM and local directory caches with a single tap to protect device storage.
-* **Reactive Library Memory:** Utilizes `Riverpod` and `FlutterSecureStorage` to save reading progress, exact scroll/page positions, and favorite titles locally, automatically updating the UI across all tabs in real-time.
 
 ---
 
@@ -57,22 +57,23 @@ The app follows a modern, decoupled architecture using **Riverpod** for state ma
 * `ExtensionService`: The Universal JS Engine. Evaluates third-party scripts in a headless webview.
 * `DownloadService`: The Offline Interceptor. Checks local disk for pages before making network requests.
 * `GeminiService`: Handles the Generative AI connection and chat state.
-* `StorageService`: The hardware-backed encryption layer storing user history, favorites, and settings.
+* `StorageService`: The hardware-backed encryption layer storing user history, favorites, settings, and unread counts.
 
 ### UI Layer
-The UI consists of reactive `ConsumerStatefulWidget`s that watch global providers (e.g. `historyProvider`, `favoritesProvider`, `bookmarkProvider`) to render updates instantly without manual state drilling.
+The UI consists of reactive `ConsumerStatefulWidget`s that watch global providers (e.g. `historyProvider`, `favoritesProvider`, `bookmarkProvider`, `appSettingsProvider`) to render updates instantly without manual state drilling.
 
 ---
 
-## 📦 Dependencies
+## 🔌 Extension Development
 
-* `flutter_riverpod`: State management and dependency injection.
-* `http`: For fetching API data and downloading image bytes.
-* `google_generative_ai`: For powering the Discover Engine chat.
-* `flutter_secure_storage`: For encrypted local database memory.
-* `flutter_inappwebview`: For the headless JavaScript BYOR extension environment.
-* `path_provider`: For accessing the device's application documents and temporary directories.
-* `html`: For parsing declarative JSON extension selectors.
+Extensions are written in standard JavaScript and parse the DOM of target websites. They must implement the following methods:
+* `getExtensionInfo()`
+* `searchManga(query)`
+* `getMangaDetails(id)`
+* `getMangaChapters(id)`
+* `getChapterPages(chapterId)`
+
+Place your scripts in a GitHub repository alongside an `index.json` catalog file, and Matcha Reader will dynamically load them into the global store.
 
 ---
 

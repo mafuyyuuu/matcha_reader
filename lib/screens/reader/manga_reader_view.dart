@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/storage_service.dart';
 import '../../providers/providers.dart';
@@ -57,6 +58,10 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
 
   void _onScroll() {
     if (_readMode != ReadMode.vertical) return;
+    
+    // Check for prefetching
+    _triggerPrefetch();
+
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 1500) {
       if (!_isLoading && _currentIndex < widget.chapters.length - 1) {
         _loadNextChapter();
@@ -66,8 +71,36 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
 
   void _onPageChanged(int index) {
     if (_readMode == ReadMode.vertical) return;
+    
+    // Pre-fetch next pages in horizontal mode
+    for (int i = 1; i <= 3; i++) {
+      if (index + i < _pageUrls.length) {
+        final url = _pageUrls[index + i];
+        if (url.startsWith('http')) precacheImage(CachedNetworkImageProvider(url), context);
+      }
+    }
+
     if (!_isLoading && index >= _pageUrls.length - 2 && _currentIndex < widget.chapters.length - 1) {
       _loadNextChapter();
+    }
+  }
+
+  // Pre-fetch based on scroll estimation
+  void _triggerPrefetch() {
+    if (_pageUrls.isEmpty || _readMode != ReadMode.vertical || !mounted) return;
+    
+    // Roughly estimate current page based on scroll offset (assume avg page height 800)
+    final approxPageIndex = (_scrollController.offset / 800).floor();
+    
+    // Prefetch next 3 pages
+    for (int i = 1; i <= 3; i++) {
+       int target = approxPageIndex + i;
+       if (target >= 0 && target < _pageUrls.length) {
+         final url = _pageUrls[target];
+         if (url.startsWith('http')) {
+           precacheImage(CachedNetworkImageProvider(url), context);
+         }
+       }
     }
   }
 
@@ -111,7 +144,6 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
           networkFallback: () => ref.read(mangaDexServiceProvider).fetchChapterPages(chapter['id']!),
         );
       } else {
-        // Universal Routing
         final repos = ref.read(extensionsProvider);
         final repo = repos.firstWhere((r) => r['name'] == widget.source || r['url'] == widget.source);
         pages = await ref.read(extensionServiceProvider).fetchChapterPages(repo, chapter['id']!);
@@ -124,6 +156,14 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
         });
         await _saveBookmark(chapter['number']!);
         _handleSafeJump();
+        if (!mounted) return;
+        
+        // Initial prefetch of first 3 pages
+        for (int i = 0; i < 3 && i < pages.length; i++) {
+          if (pages[i].startsWith('http')) {
+             precacheImage(CachedNetworkImageProvider(pages[i]), context);
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -157,8 +197,8 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
   Future<void> _loadNextChapter() async {
     setState(() => _isLoading = true);
     final chapter = widget.chapters[_currentIndex];
-    
     _currentIndex++;
+    
 
     try {
       List<String> pages;
@@ -197,18 +237,20 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
       minScale: 1.0,
       maxScale: 4.0,
       child: isNetwork
-          ? Image.network(path, fit: BoxFit.contain, loadingBuilder: (ctx, child, progress) {
-        if (progress == null) return child;
-        return const Center(child: CircularProgressIndicator(color: AppColors.matchaGreen));
-      })
+          ? CachedNetworkImage(
+              imageUrl: path, 
+              fit: BoxFit.contain, 
+              placeholder: (ctx, url) => const Center(child: CircularProgressIndicator(color: AppColors.matchaGreen)),
+              errorWidget: (ctx, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.red)),
+            )
           : Image.file(File(path), fit: BoxFit.contain),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    
 
-    final chapter = widget.chapters[_currentIndex];
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -246,7 +288,7 @@ class _MangaReaderViewState extends ConsumerState<MangaReaderView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(widget.title, style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text('Chapter ${chapter["number"]}', style: const TextStyle(fontSize: 12, color: AppColors.matchaGreen)),
+                    Text('Chapter ${widget.chapters[_currentIndex]["number"]}', style: const TextStyle(fontSize: 12, color: AppColors.matchaGreen)),
                   ],
                 ),
                 actions: [

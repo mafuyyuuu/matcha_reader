@@ -14,44 +14,53 @@ class SearchResultsView extends ConsumerStatefulWidget {
 }
 
 class _SearchResultsViewState extends ConsumerState<SearchResultsView> {
-  List<Manga> _results = [];
+  Map<String, List<Manga>> _groupedResults = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _performSearch();
+    _performConcurrentSearch();
   }
 
-  Future<void> _performSearch() async {
-    try {
-      final mangaDexService = ref.read(mangaDexServiceProvider);
-      final extService = ref.read(extensionServiceProvider);
-      
-      // MangaDex Search
-      List<Manga> tempResults = await mangaDexService.searchManga(widget.query);
+  Future<void> _performConcurrentSearch() async {
+    final mangaDexService = ref.read(mangaDexServiceProvider);
+    final extService = ref.read(extensionServiceProvider);
+    final repos = ref.read(extensionsProvider);
 
-      // Extensions Search
-      final repos = ref.read(extensionsProvider);
-      for (var repo in repos) {
-        try {
-          final extManga = await extService.searchManga(repo, widget.query);
-          tempResults.insertAll(0, extManga); // Prioritize extension results
-        } catch (e) {
+    Map<String, List<Manga>> tempGrouped = {};
+
+    // Create a list of Futures
+    List<Future<void>> searchTasks = [];
+
+    // MangaDex Task
+    searchTasks.add(
+      mangaDexService.searchManga(widget.query).then((results) {
+        if (results.isNotEmpty) tempGrouped['MangaDex'] = results;
+      }).catchError((e) {
+        debugPrint("MangaDex search failed: $e");
+      })
+    );
+
+    // Extension Tasks
+    for (var repo in repos) {
+      searchTasks.add(
+        extService.searchManga(repo, widget.query).then((results) {
+          if (results.isNotEmpty) tempGrouped[repo['name']] = results;
+        }).catchError((e) {
           debugPrint("Extension search failed for ${repo['name']}: $e");
-        }
-      }
+        })
+      );
+    }
 
-      if (mounted) {
-        setState(() {
-          _results = tempResults;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    // Wait for all to finish concurrently
+    await Future.wait(searchTasks);
+
+    if (mounted) {
+      setState(() {
+        _groupedResults = tempGrouped;
+        _isLoading = false;
+      });
     }
   }
 
@@ -67,29 +76,44 @@ class _SearchResultsViewState extends ConsumerState<SearchResultsView> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.matchaGreen))
-          : _results.isEmpty
-          ? const Center(child: Text("No manga found. Try another title!", style: TextStyle(color: AppColors.mutedSage)))
-          : GridView.builder(
-        padding: const EdgeInsets.all(20),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 0.65,
-        ),
-        itemCount: _results.length,
-        itemBuilder: (context, index) {
-          final manga = _results[index];
-          return MangaCard(
-            mangaId: manga.id,
-            title: manga.title,
-            chapter: manga.source, // Show source instead of chapter for search results
-            progress: 0.0,
-            imageUrl: manga.imageUrl,
-            isUniversal: true, // We will update MangaCard later or just pass source
-          );
-        },
-      ),
+          : _groupedResults.isEmpty
+          ? const Center(child: Text("No manga found across any source.", style: TextStyle(color: AppColors.mutedSage)))
+          : ListView.builder(
+              padding: const EdgeInsets.all(20),
+              itemCount: _groupedResults.keys.length,
+              itemBuilder: (context, index) {
+                String sourceName = _groupedResults.keys.elementAt(index);
+                List<Manga> sourceResults = _groupedResults[sourceName]!;
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(sourceName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.darkForest)),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 250,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: sourceResults.length,
+                        itemBuilder: (context, idx) {
+                          final manga = sourceResults[idx];
+                          return MangaCard(
+                            mangaId: manga.id,
+                            title: manga.title,
+                            chapter: manga.source, 
+                            progress: 0.0,
+                            imageUrl: manga.imageUrl,
+                            isUniversal: true,
+                            source: manga.source,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                  ],
+                );
+              },
+            ),
     );
   }
 }
