@@ -40,10 +40,30 @@ cd matcha_reader
 flutter pub get
 ```
 
-**3. Configure the Gemini API Key**
-For security, the API key is not hardcoded. You must provide your Google Generative AI key as a build-time variable:
+**3. Running the App via Terminal**
+For security, the Gemini API key is not hardcoded. You must provide your Google Generative AI key as a build-time variable when running the app:
 ```bash
 flutter run --dart-define=GEMINI_API_KEY=your_actual_key_here
+```
+*(Note: If you don't have a key, you can just use `flutter run`, but the AI Discovery features will display an error message).*
+
+**4. Running via VS Code (Recommended)**
+To run the app seamlessly with the play button in VS Code, you can create a `.vscode/launch.json` file with the following configuration:
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Matcha Reader",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "toolArgs": [
+                "--dart-define=GEMINI_API_KEY=your_actual_key_here"
+            ]
+        }
+    ]
+}
 ```
 
 ---
